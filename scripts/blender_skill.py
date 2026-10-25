@@ -910,7 +910,7 @@ def trellis_command(args: list[str]) -> list[str]:
     config = load_config()
     python = config.get("trellis_python")
     if not python or not Path(python).is_file():
-        raise SystemExit("TRELLIS python missing; run: python3 scripts/blender_skill.py setup --with-trellis")
+        raise SystemExit("TRELLIS python missing; run: python3 scripts/blender_skill.py setup")
     bridge = Path(config.get("trellis_bridge") or (ROOT / "trellis" / "bridge" / "trellis2_bridge.py"))
     vendor = Path(config.get("trellis_vendor") or (ROOT / "trellis" / "vendor"))
     model = Path(config.get("model_dir") or (ROOT / "models" / "TRELLIS.2-4B"))

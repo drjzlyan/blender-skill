@@ -420,7 +420,7 @@ and a numeric check (faces, materials, UVs, scale).
 | MCP socket refused | Enable the add-on, press Start Server, check host/port |
 | Add-on not listed | Re-run setup; check Blender version and extension path |
 | `trellis doctor` CUDA error | Update NVIDIA driver; confirm `nvidia-smi` works |
-| CUDA extension import error | Re-run `setup --with-trellis`; check compiler and torch version |
+| CUDA extension import error | Re-run `setup`; check compiler and torch version |
 | OOM during generation | Use `512`, `--low-vram`, lower texture size, close other GPU apps |
 | Gated model `403` | Accept DINOv3/RMBG licenses, set `HF_TOKEN`, run `trellis download` |
 | Model download interrupted | Re-run setup; Hugging Face resumes partial files |

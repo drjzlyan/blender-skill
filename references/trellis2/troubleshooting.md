@@ -19,7 +19,7 @@ Read `errors` first, then `warnings`. Do not start a GPU job until `ok` is true.
 Re-run:
 
 ```bash
-python3 scripts/blender_skill.py setup --with-trellis
+python3 scripts/blender_skill.py setup
 ```
 
 These are compiled CUDA extensions. They need a matching `nvcc`, Python headers,
@@ -29,7 +29,7 @@ recreate it with a managed Python:
 ```bash
 uv python install 3.10
 rm -rf "$BLENDER_SKILL_HOME/venvs/trellis"
-python3 scripts/blender_skill.py setup --with-trellis
+python3 scripts/blender_skill.py setup
 ```
 
 ### Sparse attention / `flash_attn` missing
@@ -38,13 +38,13 @@ Sparse attention supports `xformers` and `flash_attn`, not `sdpa`. Setup install
 `xformers==0.0.29.post2` by default. If it is missing:
 
 ```bash
-python3 scripts/blender_skill.py setup --with-trellis
+python3 scripts/blender_skill.py setup
 ```
 
 Or use the optional faster backend:
 
 ```bash
-python3 scripts/blender_skill.py setup --with-trellis --with-flash-attn
+python3 scripts/blender_skill.py setup --with-flash-attn
 ```
 
 ### `flash_attn` missing
