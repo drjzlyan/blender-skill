@@ -174,5 +174,6 @@ seconds; check GPU utilization with `nvidia-smi`.
 
 ### Multiple concurrent jobs
 
-The add-on prevents this. CLI users must serialize jobs manually; two 4B models
-do not fit in 24 GB.
+The optional TRELLIS.2 panel serializes jobs. The MCP `trellis2_generate` /
+`trellis2_texture` tools and the CLI launch independent processes with no shared
+lock, so you must serialize them manually; two 4B models do not fit in 24 GB.

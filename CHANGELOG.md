@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Scene preflight: detect existing Blender content and unsaved state, then ask
+  whether to keep/add, create a new scene, save and reset, or close and reopen.
+- Explicit serial-generation policy for TRELLIS on one GPU, with batched
+  `--num-samples` and sequential queueing as the supported alternatives.
+
 ## 1.0.0
 
 - Single installable `blender-skill` with one `SKILL.md` and an internal,

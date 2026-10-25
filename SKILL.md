@@ -218,6 +218,84 @@ never describe a different version than the one executing the code.
   concurrent generations or a heavy render during generation.
 - Keep code idempotent: check for existing collections/objects before creating.
 
+### Scene preflight: detect existing work first
+
+Before the first scene edit, TRELLIS import, or generated model in a session,
+inspect the open file. `blender_skill_status` already returns `blender.objects`
+and `blender.filepath`; for names, dirty state, and scenes run:
+
+```python
+import bpy
+
+scene = bpy.context.scene
+names = [o.name for o in scene.objects]
+default_names = {"Cube", "Camera", "Light"}
+result = {
+    "file": bpy.data.filepath,
+    "dirty": bool(bpy.data.is_dirty),
+    "scene": scene.name,
+    "objects": len(names),
+    "non_default": [n for n in names if n not in default_names],
+    "names": names[:25],
+    "scenes": [s.name for s in bpy.data.scenes],
+}
+```
+
+Treat the session as **occupied** when any of these is true:
+
+- `bpy.data.filepath` is non-empty, or
+- an object is not one of the default startup objects (`Cube`, `Camera`, `Light`), or
+- more than those three objects exist, or
+- another scene or a non-default collection contains user content.
+
+When occupied, **stop and ask the user before changing anything**. Report the
+file name, object count, and unsaved state, then offer:
+
+| Choice | Action |
+|---|---|
+| Keep and add | Keep the scene; import/generate into a new collection with unique names |
+| New scene | Create and switch to an empty scene, leaving the old scene intact |
+| Save, then reset | Save the current `.blend`, then load an empty file |
+| Close and reopen | Save, then the user quits and relaunches Blender; reconnect the add-on after |
+| Cancel | Do not modify the scene |
+
+Do not delete, purge, rename, or overwrite existing data until the user picks.
+Do not quit Blender yourself: closing it kills the MCP server and can lose
+unsaved work. The **Close and reopen** choice must be performed by the user.
+After relaunch, re-enable the add-on and re-run `blender_skill_status` before
+continuing.
+
+**New scene — non-destructive, default when the user has unsaved work:**
+
+```python
+import bpy
+
+name = "SCENE_<asset>"
+scene = bpy.data.scenes.get(name) or bpy.data.scenes.new(name)
+if bpy.context.window:
+    bpy.context.window.scene = scene
+result = {"scene": scene.name, "scenes": [s.name for s in bpy.data.scenes]}
+```
+
+Every existing object stays untouched. `trellis2_import` links its collection
+into the active scene, so switch the window scene first.
+
+**Save, then reset — destructive, only after explicit confirmation:**
+
+```python
+import bpy
+
+if not bpy.data.filepath:
+    raise RuntimeError("Save the current file to an explicit path first")
+bpy.ops.wm.save_mainfile()
+bpy.ops.wm.read_homefile(use_empty=True)
+```
+
+`read_homefile(use_empty=True)` loads a truly empty file; without `use_empty`
+it reloads the startup scene instead. If the file has never been saved, use
+`bpy.ops.wm.save_as_mainfile(filepath=<user-chosen-path>)` first. Never run this
+on unsaved work.
+
 ---
 
 ## 3. TRELLIS.2 image-to-3D
@@ -275,6 +353,36 @@ Always pass `--seed` explicitly. Use `--num-samples 4` for a seed sweep;
 outputs are suffixed `_00`–`_03`. Every output gets a JSON sidecar with the
 seed, settings, face counts, timings, and errors.
 
+### Parallel generation: one job at a time
+
+**Default answer: one TRELLIS job at a time.** Each `trellis2_generate` or
+`trellis2_texture` call starts a separate Python process that loads the full
+model onto the default CUDA device. The MCP TRELLIS path and CLI have no shared
+job queue or GPU lock. The optional TRELLIS panel rejects a second job, but that
+does not protect MCP or CLI calls. Two `1024_cascade` jobs on a 24 GB card
+contend for VRAM and typically OOM or crawl. GLB imports also serialize on
+Blender's main thread.
+
+To produce multiple models safely:
+
+1. **Batch variants in one job** — `--num-samples 4` (or a seed sweep) loads the
+   model once and writes outputs suffixed `_00`–`_03`. This is far faster than
+   four separate calls.
+2. **Queue jobs sequentially** — start the next job only after the previous
+   result returns. A loop over reference images is fine.
+3. **Use the wait productively** — read references, plan cleanup, inspect
+   existing assets, or write scripts. Do not render, sculpt, or import while a
+   generation process is running.
+4. **Multiple GPUs are not supported out of the box.** Inference uses the default
+   CUDA device and the MCP tool exposes no device flag. One job per GPU requires
+   manual isolation (for example separate CLI processes with
+   `CUDA_VISIBLE_DEVICES=0` and `=1`) plus enough VRAM per job. Verify it before
+   recommending it.
+
+If a second generation request arrives while one is active, refuse it, report
+the active job, and queue it. Never rely on the client or the MCP server to
+serialize calls.
+
 ### Texture an approved mesh
 
 ```bash
@@ -314,7 +422,9 @@ blown highlights.
 - Never `pip install` into Blender.
 - Never ship raw TRELLIS output as final game topology.
 - Never overwrite an input image or mesh.
-- Never run multiple GPU jobs concurrently on a 24 GB card.
+- Never run multiple GPU jobs concurrently on one GPU.
+- Never quit Blender, delete the scene, or reset the file without explicit
+  confirmation.
 - Never claim reference fidelity without a screenshot comparison.
 
 ---
@@ -370,7 +480,8 @@ its triggers. Then open only what the task needs.
 
 ```text
 1. INTAKE     brief with asset class, engine, budget, animation, style
-2. DETECT     doctor; report Blender, GPU, VRAM, TRELLIS, missing pieces
+2. DETECT     doctor; scene preflight; report Blender, GPU, VRAM, TRELLIS, missing pieces
+              if the scene has existing items, ask: keep/add vs new scene vs save+reset
 3. BASE       TRELLIS image-to-3D or manual blockout; record provenance
 4. PROPORTION match landmarks; three-angle silhouette check
 5. DETAIL     sculpt, hard-surface, hair, cloth, simulation as needed
@@ -394,6 +505,8 @@ and a numeric check (faces, materials, UVs, scale).
 ### MUST DO
 
 - Run `doctor` before the first task in a session.
+- Run the scene preflight and get the user's choice when Blender already has
+  content; prefer a new scene or collection over deleting work.
 - Report the detected hardware profile before a long TRELLIS job.
 - Keep runtime state outside the repository.
 - Use the MCP for live scene edits; use the CLI for background/batch work.
@@ -408,6 +521,8 @@ and a numeric check (faces, materials, UVs, scale).
 - Commit model weights, venvs, outputs, or downloaded documentation.
 - Claim TRELLIS fidelity without a side-by-side screenshot check.
 - Run destructive scene operations without confirmation.
+- Run two TRELLIS generation or texture jobs concurrently on one GPU.
+- Close, quit, or reset Blender or its open file without explicit confirmation.
 - Install Python packages into Blender's interpreter.
 
 ---
@@ -422,6 +537,9 @@ and a numeric check (faces, materials, UVs, scale).
 | `trellis doctor` CUDA error | Update NVIDIA driver; confirm `nvidia-smi` works |
 | CUDA extension import error | Re-run `setup`; check compiler and torch version |
 | OOM during generation | Use `512`, `--low-vram`, lower texture size, close other GPU apps |
+| Two TRELLIS jobs OOM or stall | They are running concurrently; kill one and run jobs serially |
+| Existing scene changed unexpectedly | Stop; re-run preflight, use a new scene/collection, and restore from backup |
+| User asks for a fresh Blender session | Save first; quitting Blender ends the MCP connection, so reconnect after relaunch |
 | Gated model `403` | Accept DINOv3/RMBG licenses, set `HF_TOKEN`, run `trellis download` |
 | Model download interrupted | Re-run setup; Hugging Face resumes partial files |
 | Weights path wrong | Pass `--model-dir` or set `TRELLIS2_MODEL` |

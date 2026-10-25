@@ -158,6 +158,20 @@ The server exposes live-scene tools rather than a script generator:
 API documentation is read from the **running** Blender, so it always matches the
 version executing the code. No 27 MB GPL documentation copy is vendored.
 
+### Scene safety and parallel jobs
+
+Before creating geometry or importing a GLB, the skill inspects the open Blender
+file. If it already has content or unsaved changes, the agent reports the file,
+object count, and dirty state, then asks whether to keep and add, create a new
+scene, save and reset, or cancel. It never quits Blender, deletes objects, or
+resets the file on its own.
+
+TRELLIS jobs run **one at a time**. Each job starts a separate process that
+loads the full model onto the default CUDA device; the bridge has no job queue,
+GPU lock, or device selection. Concurrent jobs on one GPU contend for VRAM and
+usually OOM. Use `--num-samples` for seed variants in a single load, or queue
+reference images sequentially. Multiple GPUs are not currently supported.
+
 ## TRELLIS.2
 
 TRELLIS.2 runs in an isolated Python environment. Blender only imports the

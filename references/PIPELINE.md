@@ -29,8 +29,9 @@ Choose one:
   structure.
 
 TRELLIS rules: explicit seed; `512` for ideation, `1024_cascade` for production
-balance; validate the sidecar; one job at a time. Read
-`references/trellis2/README.md`.
+balance; validate the sidecar; one job at a time. Before the first generated
+asset, run the scene preflight (SKILL.md §2) and get the user's choice when the
+open file already has content. Read `references/trellis2/README.md`.
 
 **Gate:** silhouette reads from three angles; scale is plausible; provenance is
 recorded.
