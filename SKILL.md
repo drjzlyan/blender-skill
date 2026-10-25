@@ -27,8 +27,8 @@ A single installable skill that owns the whole Blender production loop:
   pipelines, QA) that live inside `references/`. They are **not** separate
   skills. Read them directly, in place.
 
-Never ask the user to install 90+ skills. Installing this one skill is the
-whole setup.
+Never ask the user to install a pile of separate skills. Installing this one
+skill is the whole setup.
 
 ---
 

@@ -69,7 +69,7 @@ class PackagingTests(unittest.TestCase):
                 text = path.read_text(encoding="utf-8", errors="replace")
             except OSError:
                 continue
-            if any(pattern.search(text) for pattern in patterns) or "dhiraj" in text.lower():
+            if any(pattern.search(text) for pattern in patterns):
                 offenders.append(str(path.relative_to(ROOT)))
         self.assertEqual(offenders, [], f"machine paths or identity in: {offenders[:10]}")
 

@@ -255,7 +255,7 @@ The test suite covers:
 4. **MCP live** — connect to the add-on, create an object, read the scene,
    capture a screenshot, render a thumbnail.
 5. **TRELLIS** — doctor, one 512 generation, sidecar validation, GLB import,
-   face-count and material checks.
+   face-count/material checks, and an isolated render of the generated asset.
 
 A release is only tagged when 1–4 pass and 5 passes on a CUDA machine with the
 recommended VRAM profile.
