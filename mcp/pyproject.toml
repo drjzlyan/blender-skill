@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "blender-skill-mcp"
+version = "1.0.0"
+description = "MIT MCP bridge for the blender-skill agent skill"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "blender-skill contributors" }]
+dependencies = ["mcp[cli]>=1.2.0,<2"]
+
+[project.scripts]
+blender-skill-mcp = "blender_skill_mcp.server:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["blender_skill_mcp*"]

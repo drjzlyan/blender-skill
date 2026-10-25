@@ -1,0 +1,13 @@
+schema_version = "1.0.0"
+id = "blender_skill_mcp"
+version = "1.0.0"
+name = "Blender Skill MCP"
+tagline = "Local MCP bridge for the blender-skill agent skill"
+maintainer = "blender-skill contributors"
+type = "add-on"
+tags = ["Development", "3D View"]
+blender_version_min = "4.5.0"
+license = ["SPDX:MIT"]
+
+[permissions]
+network = "Listen on localhost so a local MCP client can drive Blender"

@@ -1,0 +1,10 @@
+schema_version = "1.0.0"
+id = "trellis2_bridge"
+version = "1.0.0"
+name = "TRELLIS.2 Bridge"
+tagline = "Generate PBR assets from images with a local TRELLIS.2 install"
+maintainer = "TRELLIS.2"
+type = "add-on"
+tags = ["Import-Export", "Object", "3D View"]
+blender_version_min = "4.2.0"
+license = ["SPDX:MIT"]
