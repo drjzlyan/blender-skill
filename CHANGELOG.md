@@ -11,6 +11,10 @@
   Documents the `1024_cascade` black-bake failure and why per-vertex colour is not enough.
 - Landmark-derived height marks (neck/waist/hem from the front art), `--side-start`, and a guide section on
   getting consistent reference art from a model sheet plus same-chat per-view images.
+- `references/trellis2/model-comparison.md` and `scripts/alt_models/`: measured TRELLIS.2 vs Pixal3D vs Hunyuan3D 2.1 on a
+  24 GB card, reproducible env builders with every install fix, and benchmark scripts (mesh stats, silhouette IoU).
+- `trellis_project_colour.py`: OBJ input, `--flip-z`, and baking object transforms into the mesh (a leftover import
+  rotation folded the projected texture).
 - Tests: unit tests for the colour library and GPU detection, and a live end-to-end test.
 
 ## 1.0.0

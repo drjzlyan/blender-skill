@@ -41,6 +41,7 @@ ap.add_argument("--back-low", type=float, default=0.0, help="restrict the back a
 ap.add_argument("--side-start", type=float, default=0.55, help="|normal.x| below which the side art is ignored; thin sideways features (cheek curls) then keep the front/back colour")
 ap.add_argument("--sharp", type=float, default=3.0, help="blend sharpness between views")
 ap.add_argument("--no-toon", action="store_true")
+ap.add_argument("--flip-z", action="store_true", help="the model faces +Y (e.g. Pixal3D output): turn it 180 degrees about Z so it faces -Y like TRELLIS")
 ap.add_argument("--rim", type=float, default=0.0, help="warm rim-light strength (0 = off)")
 a = ap.parse_args(argv)
 D = Path(a.dir)
@@ -64,9 +65,27 @@ arts = {v: load_rgb(D / f"{a.prefix}-{v}-filled.png") for v in views}
 masks = {v: load_mask(D / (f"{a.prefix}-{v}-extent.png" if (D / f"{a.prefix}-{v}-extent.png").exists() else f"{a.prefix}-{v}-mask.png")) for v in views}
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
-bpy.ops.import_scene.gltf(filepath=a.glb)
+if a.glb.lower().endswith(".obj"):
+    bpy.ops.wm.obj_import(filepath=a.glb)   # e.g. Hunyuan3D paint-stage output (OBJ imports facing -Y)
+else:
+    bpy.ops.import_scene.gltf(filepath=a.glb)
 ob = next(o for o in bpy.context.scene.objects if o.type == "MESH")
 bpy.context.view_layer.objects.active = ob
+if a.flip_z:
+    top = ob
+    while top.parent is not None:
+        top = top.parent
+    top.rotation_euler[2] += math.pi
+    bpy.context.view_layer.update()
+# Bake every object transform into the mesh. The shader samples rest-pose "Generated" coordinates, which live in
+# the object's LOCAL space, while the weights and canonical views are computed in world space: they only agree
+# when the transform is identity (OBJ import leaves a Y-up -> Z-up rotation on the object; --flip-z adds one).
+for o in bpy.context.scene.objects:
+    o.select_set(False)
+ob.select_set(True)
+bpy.context.view_layer.objects.active = ob
+bpy.ops.object.parent_clear(type="CLEAR_KEEP_TRANSFORM")
+bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 me = ob.data
 n = len(me.vertices)
 co = np.empty(n * 3, dtype=np.float32); me.vertices.foreach_get("co", co); co = co.reshape(n, 3)

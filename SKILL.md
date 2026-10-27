@@ -406,7 +406,7 @@ collection cleanup). Then:
 7. Render a hero-angle screenshot and compare it to the reference.
 8. Report seed, quality, face counts, limitations, and the next pipeline step.
 
-For stylized characters read `references/trellis2/stylized-characters.md` first. Read `references/trellis2/` for CLI details, import protocol, add-on usage, and
+For stylized characters read `references/trellis2/stylized-characters.md` first; for choosing between TRELLIS.2, Pixal3D and Hunyuan3D read `references/trellis2/model-comparison.md`. Read `references/trellis2/` for CLI details, import protocol, add-on usage, and
 troubleshooting.
 
 ### Reference image rules
