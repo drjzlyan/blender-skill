@@ -51,6 +51,29 @@ decimation (it needs the plotly/dash chain just to import); the paint stage also
 `facebook/dinov2-giant` (~4.5 GB) and calls `snapshot_download` on the repo id, so patch it to accept a local
 directory. `scripts/alt_models/build_hunyuan_env.sh` applies all of this.
 
+## What the Hugging Face Space does differently (read from its `app.py`, 2026-10-27)
+
+- **Same model.** The Space loads `TencentARC/Pixal3D-T`; all 11 weight files are byte-identical (SHA-256) to
+  `TencentARC/Pixal3D`. Same sampler defaults (12 steps; guidance 7.5 / 7.5 / 1.0) and the same MoGe camera estimate.
+- **Same export.** `extract_glb_api` calls `o_voxel.postprocess.to_glb(remesh=True, remesh_band=1, remesh_project=0)`,
+  the same rotation, and `extension_webp=True`, exactly like the local `inference.py` and this skill's TRELLIS bridge.
+  There is no hidden export improvement, and Blender plays no part in it. Exporting through this skill gives the same
+  mesh and texture for the same latents.
+- **Standard mode on a big GPU.** `low_vram = False` (everything resident) on ZeroGPU, with a UI-chosen cascade
+  resolution (the CLI defaults to 1536 in standard mode). On 24 GB, `--low_vram --resolution 1536` works: 148 s,
+  18.7 GiB VRAM. It changed little for a flat cartoon character (980k faces vs 996k; main piece 97.5% vs 93.4%).
+- **Generate once, export many times.** It stores the shape and texture latents, then re-decodes and re-exports with
+  a chosen `decimation_target` and `texture_size`. Worth copying: save the latents, then export a ~150k-face mesh
+  for rigging and a 1M-face one for a hero shot without regenerating.
+- **Manual FOV override** (degrees or radians) when MoGe's estimate is poor; MoGe is trained on photos, so
+  check its estimate on illustrations.
+- **Presentation.** Its previews are PBR renders with HDRI lighting (forest, sunset, courtyard) and normal / clay /
+  base-colour modes, rendered after `mesh.simplify(16777216)`. Part of the polished look is lighting, which this
+  skill can reproduce in Blender.
+
+Not fixed by any of that: ghosting at side angles (doubled skirt hem, see-through legs) is in the generated geometry,
+and it survived the 1536 run. Cleaning inner shells and hidden faces is a Blender-side job this skill can do.
+
 ## Using them with the colour pipeline
 
 `trellis_project_colour.py` accepts GLB or OBJ. Use `--flip-z` for models that face +Y (Pixal3D). It now bakes all
