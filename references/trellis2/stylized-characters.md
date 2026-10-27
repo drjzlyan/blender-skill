@@ -2,6 +2,27 @@
 
 Verified end to end on 2026-10-27 (RTX 4090, Blender 5.2, `1024_cascade`, ~97 s per mesh).
 
+## Getting good reference art (this matters more than anything downstream)
+
+Art that is generated one view at a time drifts between views, and the mesh and colour inherit that.
+What worked (verified with ChatGPT image generation in the owner's signed-in Chrome, driven with
+Claude in Chrome; check your plan's terms before commercial use):
+
+1. Ask for ONE model sheet first: "character model sheet (orthographic turnaround): FRONT, LEFT SIDE
+   PROFILE (facing left), BACK; same size and height, feet on one baseline; strict neutral A-pose;
+   identical design in every view; flat orthographic view, no perspective, no ground shadow, no text".
+   Describe the design in detail once (face, hair, outfit, palette). This locks one design.
+2. In the same chat, ask for each view again as its own large portrait image ("generate ONLY the FRONT
+   view of this exact same character, portrait, full body from the top of the hair to the soles,
+   centred, plain white background"), then BACK, then LEFT SIDE ("true 90-degree side view, arms hang
+   straight down"). Same-chat context keeps the design identical, and each view is 1024x1536, so the
+   face is large enough for crisp colour.
+3. Use the FRONT image for TRELLIS geometry. Read the neck, waist and hem rows off the front, back and
+   side images and pass them as `--landmarks-<view>` to `trellis_prep_refs.py`.
+
+Compared with generating each view separately from a short prompt, this removed the trousers-vs-skirt
+and hands-on-hips drift entirely, so the back and side art can be trusted everywhere.
+
 ## Pipeline
 
 ```text
@@ -36,7 +57,9 @@ approved reference art (front, back, side)  ->  TRELLIS.2 geometry  ->  mesh-reg
    row (`trellis_colour_lib.canonical_view`), packed into the `.blend`, and sampled per pixel by a
    toon material using rest-pose Generated coordinates, so colour does not swim when posed.
    Per-vertex blend weights (a `ProjW` attribute, stable under deformation) pick front, back or side
-   by facing direction, with zones that keep bad art regions out.
+   by facing direction. The side art only takes over on near-profile surfaces (`--side-start`), so thin
+   sideways features such as cheek curls keep the front/back colour. Mesh heights for the neck, waist
+   and hem come from the front art's landmarks.
 
 ## Why not TRELLIS's own colour, or vertex colour
 

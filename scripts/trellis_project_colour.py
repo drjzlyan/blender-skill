@@ -37,7 +37,8 @@ ap.add_argument("--out", required=True)
 ap.add_argument("--render", default="")
 ap.add_argument("--size", type=int, default=2048, help="canonical image size")
 ap.add_argument("--torso-x", type=float, default=0.16, help="half-width of the torso where the back art is trusted")
-ap.add_argument("--back-low", type=float, default=0.46, help="lowest height where the back art is trusted (hands-on-hips art would smear below)")
+ap.add_argument("--back-low", type=float, default=0.0, help="restrict the back art to above this height (0 = trust it everywhere); use for back art that drifts from the front")
+ap.add_argument("--side-start", type=float, default=0.55, help="|normal.x| below which the side art is ignored; thin sideways features (cheek curls) then keep the front/back colour")
 ap.add_argument("--sharp", type=float, default=3.0, help="blend sharpness between views")
 ap.add_argument("--no-toon", action="store_true")
 ap.add_argument("--rim", type=float, default=0.0, help="warm rim-light strength (0 = off)")
@@ -80,28 +81,45 @@ x, y, z = co[:, 0], co[:, 1], co[:, 2]
 zn = (z - lo[2]) / height
 
 # ---- canonical, mesh-registered images --------------------------------------------------------
-LANDMARKS = {  # mesh height (0 soles .. 1 top of buns) -> art row, per view
-    "front": lambda m: (lambda zz: m["y0"] + (1 - zz) * (m["y1"] - m["y0"])),
-    "back": lambda m: (lambda zz: np.interp(zz, [0.0, 0.33, 0.58, 1.0], [m["y1"], m.get("waist", m["y0"] + 0.68 * (m["y1"] - m["y0"])), m.get("neck", m["y0"] + 0.29 * (m["y1"] - m["y0"])), m["y0"]])),
-    "side": lambda m: (lambda zz: np.interp(zz, [0.0, 0.146, 0.35, 0.58, 1.0], [m["y1"], m.get("hem", m["y0"] + 0.83 * (m["y1"] - m["y0"])), m.get("waist", m["y0"] + 0.70 * (m["y1"] - m["y0"])), m.get("neck", m["y0"] + 0.47 * (m["y1"] - m["y0"])), m["y0"]])),
-}
+# mesh heights of the neck, waist and hem come from the FRONT art's landmark rows (the mesh was generated
+# from it, so its proportions follow); the other views are warped so their own landmark rows land there
+fm = meta["front"]
+f_span = fm["y1"] - fm["y0"]
+MARKS = {k: 1.0 - (fm[k] - fm["y0"]) / f_span for k in ("hem", "waist", "neck") if k in fm}
+MARKS.setdefault("neck", 0.60); MARKS.setdefault("waist", 0.35); MARKS.setdefault("hem", 0.15)
+
+
+def rows_for(view):
+    m = meta[view]; h = m["y1"] - m["y0"]
+    if view == "front":
+        return lambda zz: m["y0"] + (1 - zz) * h
+    neck = m.get("neck", m["y0"] + 0.30 * h); waist = m.get("waist", m["y0"] + 0.55 * h); hem = m.get("hem", m["y0"] + 0.78 * h)
+    if view == "back":
+        return lambda zz: np.interp(zz, [0.0, MARKS["waist"], MARKS["neck"], 1.0], [m["y1"], waist, neck, m["y0"]])
+    return lambda zz: np.interp(zz, [0.0, MARKS["hem"], MARKS["waist"], MARKS["neck"], 1.0], [m["y1"], hem, waist, neck, m["y0"]])
+
+
 AXIS = {"front": (x, False), "back": (x, True), "side": (y, False)}
 SPAN = {"front": 0.9, "back": 0.9, "side": 0.8}
 canon = {}
 for v in views:
     coord, flip = AXIS[v]
     centres, m_lo, m_hi = lib.mesh_row_extents(coord, zn)
-    canon[v] = lib.canonical_view(arts[v], masks[v], centres, m_lo, m_hi, LANDMARKS[v](meta[v]),
+    canon[v] = lib.canonical_view(arts[v], masks[v], centres, m_lo, m_hi, rows_for(v),
                                   SPAN[v], a.size, a.size, flip=flip)
     print("CANON", v, canon[v].shape)
 
 # ---- per-vertex blend weights ----------------------------------------------------------------
-head = zn > 0.60
-torso = (zn <= 0.60) & (zn > a.back_low) & (np.abs(x) < a.torso_x)
+ones = np.ones(n, bool)
+zone_back = ones if a.back_low <= 0 else (zn > a.back_low) & ((zn > MARKS["neck"] - 0.02) | (np.abs(x) < a.torso_x))
+zone_side = ones
 f = np.clip(-nm[:, 1], 0, 1) ** a.sharp
-b = np.clip(nm[:, 1], 0, 1) ** a.sharp * (head | torso) * ("back" in views)
-s = np.clip(np.abs(nm[:, 0]), 0, 1) ** a.sharp * (head | (zn < 0.37)) * ("side" in views)
-f = f + 0.02 * ((nm[:, 1] <= 0) | ~(head | torso))  # never leave a vertex with no view
+b = np.clip(nm[:, 1], 0, 1) ** a.sharp * zone_back * ("back" in views)
+s = np.clip((np.abs(nm[:, 0]) - a.side_start) / (1.0 - a.side_start), 0, 1) ** a.sharp * zone_side * ("side" in views)
+# never leave a vertex with no view (e.g. surfaces facing straight up or down get all-zero weights otherwise)
+has_back = bool(b.any())
+f = f + 0.02 * ((nm[:, 1] <= 0) | ~zone_back | (not has_back))
+b = b + 0.02 * ((nm[:, 1] > 0) & zone_back & has_back)
 tot = f + b + s
 W = np.stack([f, b, s], axis=1) / np.maximum(tot, 1e-6)[:, None]
 attr = me.color_attributes.new("ProjW", "FLOAT_COLOR", "POINT")

@@ -9,6 +9,8 @@
   warps each art into a canonical view registered to the mesh silhouette, and
   `scripts/trellis_project_colour.py` builds a packed, pose-stable, texture-resolution toon material.
   Documents the `1024_cascade` black-bake failure and why per-vertex colour is not enough.
+- Landmark-derived height marks (neck/waist/hem from the front art), `--side-start`, and a guide section on
+  getting consistent reference art from a model sheet plus same-chat per-view images.
 - Tests: unit tests for the colour library and GPU detection, and a live end-to-end test.
 
 ## 1.0.0

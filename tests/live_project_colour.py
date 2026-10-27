@@ -65,8 +65,9 @@ print("OK")
 
 def run(cmd, **kw):
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=900, **kw)
-    if r.returncode != 0:
-        print(r.stdout[-2000:], r.stderr[-2000:]); raise SystemExit(f"failed: {cmd[:3]}")
+    # Blender exits 0 even when a Python script raises, and prints the traceback to stderr
+    if r.returncode != 0 or "Traceback (most recent call last)" in r.stdout + r.stderr:
+        print(r.stdout[-2000:], r.stderr[-3000:]); raise SystemExit(f"failed: {cmd[:3]}")
     return r.stdout
 
 
