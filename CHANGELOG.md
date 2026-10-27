@@ -2,10 +2,14 @@
 
 ## Unreleased
 
-- Scene preflight: detect existing Blender content and unsaved state, then ask
-  whether to keep/add, create a new scene, save and reset, or close and reopen.
-- Explicit serial-generation policy for TRELLIS on one GPU, with batched
-  `--num-samples` and sequential queueing as the supported alternatives.
+- GPU detection falls back to the TRELLIS venv's torch when `nvidia-smi` is not on PATH; the doctor
+  no longer reports "No NVIDIA GPU" on machines where CUDA works.
+- Stylized-character colour pipeline for TRELLIS.2 meshes (`references/trellis2/stylized-characters.md`):
+  `scripts/trellis_prep_refs.py` prepares front/back/side reference art, `scripts/trellis_colour_lib.py`
+  warps each art into a canonical view registered to the mesh silhouette, and
+  `scripts/trellis_project_colour.py` builds a packed, pose-stable, texture-resolution toon material.
+  Documents the `1024_cascade` black-bake failure and why per-vertex colour is not enough.
+- Tests: unit tests for the colour library and GPU detection, and a live end-to-end test.
 
 ## 1.0.0
 

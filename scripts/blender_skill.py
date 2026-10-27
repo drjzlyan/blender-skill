@@ -133,32 +133,66 @@ def find_blender() -> dict[str, Any]:
     return {"found": False, "path": None, "version": None, "version_tuple": (0, 0, 0), "ok": False}
 
 
-def gpu_info() -> dict[str, Any]:
+def _gpu_profile(vram: float) -> str:
+    if vram >= 48:
+        return "high"
+    if vram >= 24:
+        return "recommended"
+    if vram >= 16:
+        return "medium"
+    if vram >= 8:
+        return "low"
+    return "minimal"
+
+
+def _gpu_from_smi() -> dict[str, Any] | None:
     exe = shutil.which("nvidia-smi")
-    if exe:
-        proc = run([exe, "--query-gpu=name,memory.total,driver_version",
-                    "--format=csv,noheader,nounits"], timeout=15)
-        if proc.returncode == 0 and proc.stdout.strip():
-            parts = [p.strip() for p in proc.stdout.splitlines()[0].split(",")]
-            if len(parts) >= 2:
-                name = parts[0]
-                try:
-                    vram = round(float(parts[1]) / 1024, 1)
-                except ValueError:
-                    vram = 0.0
-                driver = parts[2] if len(parts) > 2 else None
-                if vram >= 48:
-                    profile = "high"
-                elif vram >= 24:
-                    profile = "recommended"
-                elif vram >= 16:
-                    profile = "medium"
-                elif vram >= 8:
-                    profile = "low"
-                else:
-                    profile = "minimal"
-                return {"vendor": "nvidia", "name": name, "vram_gb": vram, "driver": driver,
-                        "profile": profile, "cuda": True}
+    if not exe:
+        return None
+    proc = run([exe, "--query-gpu=name,memory.total,driver_version",
+                "--format=csv,noheader,nounits"], timeout=15)
+    if proc.returncode != 0 or not proc.stdout.strip():
+        return None
+    parts = [p.strip() for p in proc.stdout.splitlines()[0].split(",")]
+    if len(parts) < 2:
+        return None
+    try:
+        vram = round(float(parts[1]) / 1024, 1)
+    except ValueError:
+        vram = 0.0
+    return {"vendor": "nvidia", "name": parts[0], "vram_gb": vram,
+            "driver": parts[2] if len(parts) > 2 else None,
+            "profile": _gpu_profile(vram), "cuda": True, "source": "nvidia-smi"}
+
+
+def _gpu_from_torch() -> dict[str, Any] | None:
+    """nvidia-smi is not always on PATH (snap/IDE shells, containers). Ask the TRELLIS
+    venv's torch instead: if it sees CUDA, TRELLIS can run, which is what this probe is for."""
+    python = load_config().get("trellis_python") or str(paths_module().trellis_python())
+    if not python or not Path(python).is_file():
+        return None
+    code = ("import json,torch;ok=torch.cuda.is_available();"
+            "p=torch.cuda.get_device_properties(0) if ok else None;"
+            "print(json.dumps({'ok':ok,'name':p.name if p else None,"
+            "'vram':round(p.total_memory/2**30,1) if p else 0}))")
+    proc = run([python, "-c", code], timeout=90)
+    if proc.returncode != 0:
+        return None
+    try:
+        info = json.loads(proc.stdout.strip().splitlines()[-1])
+    except (ValueError, IndexError):
+        return None
+    if not info.get("ok"):
+        return None
+    vram = float(info["vram"])
+    return {"vendor": "nvidia", "name": info["name"], "vram_gb": vram, "driver": None,
+            "profile": _gpu_profile(vram), "cuda": True, "source": "torch"}
+
+
+def gpu_info() -> dict[str, Any]:
+    found = _gpu_from_smi() or _gpu_from_torch()
+    if found:
+        return found
     return {"vendor": None, "name": None, "vram_gb": 0.0, "driver": None,
             "profile": "mcp_only", "cuda": False,
             "note": "No NVIDIA GPU detected; manual Blender work works, TRELLIS.2 does not."}
